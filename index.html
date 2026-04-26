@@ -1,168 +1,323 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Excel Hindi Translator</title>
+  <title>Excel Hindi Translator – Baghpat Court</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
-    body { font-family: Arial; padding: 20px; background: #f5f5f5; }
-    .container { background: white; padding: 24px; border-radius: 8px; max-width: 600px; box-shadow: 0 2px 8px #0001; }
-    h2 { color: #1a237e; margin-top: 0; }
-    button { background: #1a237e; color: white; border: none; padding: 10px 22px; border-radius: 5px; cursor: pointer; margin-right: 10px; font-size: 14px; }
-    button:hover { background: #283593; }
-    input[type=file] { margin-bottom: 10px; }
-    #status { color: #555; margin-top: 12px; font-size: 14px; min-height: 20px; }
-    .legend { font-size: 12px; color: #888; margin-top: 20px; border-top: 1px solid #eee; padding-top: 12px; }
+    body { font-family: Arial; padding: 20px; background: #f0f2f5; }
+    .container { background: white; padding: 24px; border-radius: 8px; max-width: 680px; box-shadow: 0 2px 10px #0002; }
+    h2 { color: #1a237e; margin-top: 0; font-size: 18px; }
+    button { background: #1a237e; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 8px; font-size: 13px; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    button:hover:not(:disabled) { background: #283593; }
+    input[type=file] { margin-bottom: 12px; display: block; }
+    #status { color: #333; margin-top: 14px; font-size: 13px; min-height: 20px; padding: 8px 12px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #1a237e; }
+    .progress-bar { height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #1a237e; border-radius: 3px; transition: width 0.3s; width: 0%; }
+    .legend { font-size: 11px; color: #777; margin-top: 18px; border-top: 1px solid #eee; padding-top: 12px; line-height: 1.8; }
     .legend b { color: #333; }
   </style>
 </head>
 <body>
 <div class="container">
-  <h2>📋 Excel Translator – Baghpat Court</h2>
+  <h2>📋 Court Excel Processor — Baghpat District Court</h2>
 
   <input type="file" id="fileInput" accept=".xlsx,.xls"/>
-  <br>
-  <button onclick="processFile()">Upload & Process</button>
-  <button onclick="downloadFile()">⬇ Download Excel</button>
-
-  <p id="status"></p>
+  <div>
+    <button id="btnProcess" onclick="processFile()">▶ Upload & Process</button>
+    <button id="btnDownload" onclick="downloadFile()">⬇ Download Excel</button>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="progBar"></div></div>
+  <p id="status">File select karein aur Process dabayein.</p>
 
   <div class="legend">
-    <b>Col 1:</b> Same &nbsp;|&nbsp;
-    <b>Col 2:</b> Case type → short form (e.g. Bail Application/23/2026 → BA/23/2026) &nbsp;|&nbsp;
-    <b>Col 3:</b> Hindi translate + short (राज्य सरकार बनाम X → स-X, बनाम → -)
+    <b>Col 1:</b> Same रहेगा &nbsp;|&nbsp;
+    <b>Col 2:</b> Case type → Short form (BA/23/2026) &nbsp;|&nbsp;
+    <b>Col 3:</b> Hindi translate → स-नाम (राज्य/सरकार patterns) &nbsp;|&nbsp;
+    <b>Col 4:</b> Section → Short (IPC, CrPC, AA, NDPS…)
   </div>
 </div>
 
 <script>
-// ─── Case Type Short Form Map ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+//  CASE TYPE SHORT FORM MAP  (Col 2)
+// ═══════════════════════════════════════════════════════════════
 const CASE_MAP = {
   "anticipatory bail application under section 438 crpc": "ABA",
-  "anticipatory bail application":           "ABA",
-  "arbitration":                             "ARB",
-  "assesement appeal":                       "AA",
-  "assessment appeal":                       "AA",
-  "bail application":                        "BA",
-  "ceiling appeal":                          "CeilA",
-  "civil appeal":                            "CivA",
-  "civil reivision":                         "CR",
-  "civil revision":                          "CR",
-  "claim petition":                          "CP",
-  "complaint cases":                         "CC",
-  "contempt":                                "CONT",
-  "cri. case":                               "CRI",
-  "criminal appeal":                         "CrA",
-  "criminal bail cancellation":              "CBC",
-  "criminal misc.":                          "CM",
-  "criminal misc":                           "CM",
-  "criminal misc. cases":                    "CMC",
-  "criminal misc cases":                     "CMC",
-  "criminal revision":                       "CRR",
-  "d.p. misc.":                              "DPM",
-  "d.p. misc":                               "DPM",
-  "election petition":                       "EP",
-  "election revision":                       "ER",
-  "essential commodities act":               "ECA",
-  "execuition cases":                        "EC",
-  "execution cases":                         "EC",
-  "execution":                               "EXE",
-  "final report":                            "FR",
-  "first appeal":                            "FA",
-  "first appeal from order":                 "FAFO",
-  "gaurdian wards act":                      "GWA",
-  "guardian wards act":                      "GWA",
-  "hindu marriage act":                      "HMA",
-  "judge small cause court case":            "JSCCC",
-  "juvenile cases":                          "JC",
-  "land acquisition act":                    "LAA",
-  "maintenance":                             "MAINT",
-  "matrimonial":                             "MAT",
-  "misc. cases":                             "MC",
-  "misc cases":                              "MC",
-  "misc.civil":                              "MCC",
-  "misc. civil":                             "MCC",
-  "misc. civil appeal":                      "MCA",
-  "misc civil appeal":                       "MCA",
-  "misc. nagar nigam":                       "MNN",
-  "misc. pa":                                "MPA",
-  "motar accident claim pitition":           "MACP",
-  "motor accident claim petition":           "MACP",
-  "mutation appeal":                         "MutA",
-  "n.d.p.s.":                               "NDPS",
-  "ndps":                                    "NDPS",
-  "original suit":                           "OS",
-  "p.a.suit":                               "PAS",
-  "p.a. suit":                              "PAS",
-  "probate":                                 "PROB",
-  "rent control appeal":                     "RCA",
-  "rent control revision":                   "RCR",
-  "restoration":                             "REST",
-  "restoration misc":                        "RM",
-  "review":                                  "REV",
-  "s.c.c. revision":                        "SCCR",
-  "s.c.c. suit":                            "SCCS",
-  "sec.174a ipc vis-a-vis sec.195":         "S174",
-  "second appeal":                           "SA",
-  "session trial":                           "ST",
-  "small cause court":                       "SCC",
-  "special case (anti curroption)":          "SCAC",
-  "special case (anti corruption)":          "SCAC",
-  "special trial":                           "SST",
-  "s.t.- posco act":                        "POSCO",
-  "st- posco act":                           "POSCO",
-  "succession":                              "SUCC",
-  "summan case":                             "SC",
-  "summons case":                            "SC",
-  "summery trial":                           "SumT",
-  "summary trial":                           "SumT",
-  "warrant case":                            "WC",
-  "warrant or summons criminal case":        "WSC",
+  "anticipatory bail application": "ABA",
+  "arbitration":                   "ARB",
+  "assesement appeal":             "AA",
+  "assessment appeal":             "AA",
+  "bail application":              "BA",
+  "ceiling appeal":                "CeilA",
+  "civil appeal":                  "CivA",
+  "civil reivision":               "CR",
+  "civil revision":                "CR",
+  "claim petition":                "CP",
+  "complaint cases":               "CC",
+  "cc":                            "CC",
+  "contempt":                      "CONT",
+  "cri. case":                     "CRI",
+  "cri case":                      "CRI",
+  "cri":                           "CRI",
+  "criminal case":                 "CRI",
+  "criminal appeal":               "CrA",
+  "criminal bail cancellation":    "CBC",
+  "criminal misc.":                "CM",
+  "criminal misc":                 "CM",
+  "cm":                            "CM",
+  "criminal misc. cases":          "CMC",
+  "criminal misc cases":           "CMC",
+  "cmc":                           "CMC",
+  "criminal revision":             "CRR",
+  "d.p. misc.":                    "DPM",
+  "d.p. misc":                     "DPM",
+  "election petition":             "EP",
+  "election revision":             "ER",
+  "essential commodities act":     "ECA",
+  "execuition cases":              "EC",
+  "execution cases":               "EC",
+  "execution":                     "EXE",
+  "final report":                  "FR",
+  "fr":                            "FR",
+  "first appeal":                  "FA",
+  "first appeal from order":       "FAFO",
+  "gaurdian wards act":            "GWA",
+  "guardian wards act":            "GWA",
+  "hindu marriage act":            "HMA",
+  "judge small cause court case":  "JSCCC",
+  "juvenile cases":                "JC",
+  "land acquisition act":          "LAA",
+  "maintenance":                   "MAINT",
+  "matrimonial":                   "MAT",
+  "misc. cases":                   "MC",
+  "misc cases":                    "MC",
+  "mc":                            "MC",
+  "misc.civil":                    "MCC",
+  "misc. civil":                   "MCC",
+  "misc. civil appeal":            "MCA",
+  "misc civil appeal":             "MCA",
+  "misc. nagar nigam":             "MNN",
+  "misc. pa":                      "MPA",
+  "motar accident claim pitition": "MACP",
+  "motor accident claim petition": "MACP",
+  "mutation appeal":               "MutA",
+  "n.d.p.s.":                      "NDPS",
+  "ndps":                          "NDPS",
+  "original suit":                 "OS",
+  "p.a.suit":                      "PAS",
+  "p.a. suit":                     "PAS",
+  "probate":                       "PROB",
+  "rent control appeal":           "RCA",
+  "rent control revision":         "RCR",
+  "restoration":                   "REST",
+  "restoration misc":              "RM",
+  "review":                        "REV",
+  "s.c.c. revision":               "SCCR",
+  "s.c.c. suit":                   "SCCS",
+  "sec.174a ipc vis-a-vis sec.195":"S174",
+  "second appeal":                 "SA",
+  "session trial":                 "ST",
+  "session trial..st":             "ST",
+  "st":                            "ST",
+  "small cause court":             "SCC",
+  "special case (anti curroption)":"SCAC",
+  "special case (anti corruption)":"SCAC",
+  "special trial":                 "SST",
+  "special trial..sst":            "SST",
+  "sst":                           "SST",
+  "s.t.- posco act":               "POSCO",
+  "st- posco act":                 "POSCO",
+  "posco":                         "POSCO",
+  "succession":                    "SUCC",
+  "summan case":                   "SC",
+  "summons case":                  "SC",
+  "sc":                            "SC",
+  "summery trial":                 "SumT",
+  "summary trial":                 "SumT",
+  "warrant case":                  "WC",
+  "wc":                            "WC",
+  "warrant or summons criminal case": "WSC",
+  "wsc":                           "WSC",
 };
 
-// ─── Column 2: Shorten case type keeping /number/year intact ─────────────────
+// ═══════════════════════════════════════════════════════════════
+//  SECTION SHORT FORM MAP  (Col 4)
+//  Longer phrases first so they match before sub-strings
+// ═══════════════════════════════════════════════════════════════
+const SECTION_MAP = [
+  // Full act names → short
+  ["protection of children from sexual offences act",      "POCSO Act"],
+  ["protection of children from sexual offences",         "POCSO"],
+  ["pocso act",                                            "POCSO Act"],
+  ["narcotic drugs and psychotropic substances act",       "NDPS Act"],
+  ["narcotic drugs and psychotropic substances",          "NDPS"],
+  ["prevention of corruption act",                        "PC Act"],
+  ["prevention of money laundering act",                  "PMLA"],
+  ["code of criminal procedure",                          "CrPC"],
+  ["criminal procedure code",                             "CrPC"],
+  ["code of civil procedure",                             "CPC"],
+  ["civil procedure code",                                "CPC"],
+  ["indian penal code",                                   "IPC"],
+  ["motor vehicles act",                                  "MVA"],
+  ["motor vehicle act",                                   "MVA"],
+  ["negotiable instruments act",                          "NI Act"],
+  ["land acquisition act",                                "LAA"],
+  ["essential commodities act",                           "ECA"],
+  ["dowry prohibition act",                               "DPA"],
+  ["domestic violence act",                               "DVA"],
+  ["protection of women from domestic violence act",      "PWDVA"],
+  ["information technology act",                          "IT Act"],
+  ["scheduled castes and scheduled tribes",               "SC/ST Act"],
+  ["sc/st (prevention of atrocities) act",                "SC/ST Act"],
+  ["prevention of atrocities act",                        "PoA Act"],
+  ["foreign exchange management act",                     "FEMA"],
+  ["companies act",                                       "Co. Act"],
+  ["hindu marriage act",                                  "HMA"],
+  ["hindu succession act",                                "HSA"],
+  ["transfer of property act",                            "TPA"],
+  ["specific relief act",                                 "SRA"],
+  ["limitation act",                                      "Lim. Act"],
+  ["evidence act",                                        "Evid. Act"],
+  ["indian evidence act",                                 "IEA"],
+  ["contract act",                                        "Contract Act"],
+  ["indian contract act",                                 "ICA"],
+  ["representation of the people act",                    "RPA"],
+  ["representation of people act",                        "RPA"],
+  ["electricity act",                                     "Elec. Act"],
+  ["forest act",                                          "Forest Act"],
+  ["arms act",                                            "Arms Act"],
+  ["explosive substances act",                            "ESA"],
+  ["explosives act",                                      "Expl. Act"],
+  ["public gambling act",                                 "PGA"],
+  ["excise act",                                          "Excise Act"],
+  ["u.p. excise act",                                     "UP Excise"],
+  ["up excise act",                                       "UP Excise"],
+  ["gangsters act",                                       "Gangsters Act"],
+  ["u.p. gangsters act",                                  "UP Gangsters"],
+  ["goonda act",                                          "Goonda Act"],
+  ["u.p. goonda act",                                     "UP Goonda"],
+  ["stamp act",                                           "Stamp Act"],
+  ["registration act",                                    "Reg. Act"],
+  ["probation of offenders act",                          "POA"],
+  ["juvenile justice act",                                "JJ Act"],
+  ["rent control act",                                    "RC Act"],
+  ["u.p. rent control act",                               "UPRC Act"],
+  ["food adulteration act",                               "FA Act"],
+  ["prevention of food adulteration act",                 "PFA Act"],
+  ["food safety and standards act",                       "FSSAI Act"],
+  ["lok adalat",                                          "Lok Adalat"],
+  // Common abbreviations already short — keep as-is but normalise
+  ["ipc",    "IPC"],
+  ["crpc",   "CrPC"],
+  ["cpc",    "CPC"],
+  ["ndps",   "NDPS"],
+  ["pocso",  "POCSO"],
+  ["mvact",  "MVA"],
+  ["itact",  "IT Act"],
+];
+
+function shortenSection(text) {
+  if (!text) return text;
+  let s = String(text);
+  const lower = s.toLowerCase();
+  for (const [from, to] of SECTION_MAP) {
+    if (lower.includes(from.toLowerCase())) {
+      const re = new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      s = s.replace(re, to);
+    }
+  }
+  return s.trim();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  COLUMN 2: Case number shortener
+// ═══════════════════════════════════════════════════════════════
 function shortenCaseNo(cellVal) {
-  if (!cellVal) return cellVal;
+  if (cellVal === undefined || cellVal === null || cellVal === '') return cellVal;
   const str = String(cellVal);
   const slashIdx = str.indexOf("/");
+  let typePart, restPart;
   if (slashIdx === -1) {
-    // No slash — just try to replace whole value as case type
-    const key = str.trim().toLowerCase().replace(/\s+/g, ' ');
-    return CASE_MAP[key] || str;
+    typePart = str.trim();
+    restPart = '';
+  } else {
+    typePart = str.substring(0, slashIdx).trim();
+    restPart = str.substring(slashIdx);
   }
-  const typePart  = str.substring(0, slashIdx).trim();
-  const restPart  = str.substring(slashIdx);          // keeps "/23/2026"
-  const key       = typePart.toLowerCase().replace(/\s+/g, ' ');
-  const shortForm = CASE_MAP[key] || typePart;         // fallback = original
+  const key = typePart.toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\.{2,}/g, '.')
+    .trim();
+  const shortForm = CASE_MAP[key] || typePart;
   return shortForm + restPart;
 }
 
-// ─── Column 3: Post-process translated Hindi ─────────────────────────────────
-// "राज्य सरकार बनाम X" → "स-X"
-// "A बनाम B"           → "A-B"
+// ═══════════════════════════════════════════════════════════════
+//  COLUMN 3: Hindi post-processing
+//  Handle: उत्तर प्रदेश राज्य / यूपी राज्य / राज्य सरकार / State → "स-"
+// ═══════════════════════════════════════════════════════════════
 function shortenHindi(text) {
   if (!text) return text;
-  text = text.replace(/राज्य\s*सरकार\s*बनाम\s*/g, 'स-');
-  text = text.replace(/\s*बनाम\s*/g, '-');
-  return text.trim();
-}
+  let s = text.trim();
 
-// ─── Google Translate ─────────────────────────────────────────────────────────
-async function translateToHindi(text) {
-  const res  = await fetch(
-    `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=hi&dt=t&q=${encodeURIComponent(text)}`
+  // Pattern: anything that means "state/govt" before बनाम → "स-"
+  // Covers: उ.प्र. राज्य, उत्तर प्रदेश राज्य, यूपी राज्य, राज्य सरकार, सरकार etc.
+  s = s.replace(
+    /(?:उत्तर\s*प्रदेश\s*(?:राज्य|सरकार)|उ\.?\s*प्र\.?\s*(?:राज्य|सरकार)|यू\.?पी\.?\s*(?:राज्य|सरकार)|राज्य\s*सरकार|राज्य|सरकार)\s*बनाम\s*/gi,
+    'स-'
   );
-  const data = await res.json();
-  return data[0].map(d => d[0]).join('');
+
+  // Remaining "बनाम" → "-"
+  s = s.replace(/\s*बनाम\s*/g, '-');
+
+  // Clean double "स-स-" if translated oddly
+  s = s.replace(/स-स-/g, 'स-');
+
+  return s.trim();
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+//  TRANSLATION with retry + delay
+// ═══════════════════════════════════════════════════════════════
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function translateToHindi(text, retries = 4) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(
+        `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=hi&dt=t&q=${encodeURIComponent(text)}`
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      return data[0].map(d => d[0]).join('');
+    } catch (err) {
+      if (attempt < retries) {
+        const waitMs = 800 * (attempt + 1);   // 0.8s, 1.6s, 2.4s, 3.2s
+        setStatus(`⚠ Translate error (row retry in ${waitMs/1000}s)… "${text.substring(0,30)}"`);
+        await sleep(waitMs);
+      } else {
+        console.error("Translation failed:", text, err);
+        return text;  // return original on final failure
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MAIN PROCESSING
+// ═══════════════════════════════════════════════════════════════
 let workbook;
 let translatedData = [];
 
 async function processFile() {
   const file = document.getElementById('fileInput').files[0];
-  if (!file) { alert("Please upload an Excel file"); return; }
+  if (!file) { alert("Pehle Excel file select karein!"); return; }
 
-  setStatus("Reading file…");
+  setBtns(true);
+  setStatus("📂 File read ho rahi hai…");
+  setProgress(0);
+
   const reader = new FileReader();
   reader.onload = async function(e) {
     const data = new Uint8Array(e.target.result);
@@ -171,46 +326,61 @@ async function processFile() {
     const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
     translatedData = [];
+    const total = jsonData.length - 1;  // excluding header
 
     for (let i = 0; i < jsonData.length; i++) {
-      const row = [...jsonData[i]];   // shallow copy
+      const row = [...jsonData[i]];
 
-      if (i === 0) {                  // header row — keep as-is
+      if (i === 0) {
         translatedData.push(row);
         continue;
       }
 
-      // Col 2 (index 1) — shorten case number
+      // ── Col 2 (index 1): case type shortening ──
       if (row[1] !== undefined && row[1] !== null && row[1] !== '') {
         row[1] = shortenCaseNo(row[1]);
       }
 
-      // Col 3 (index 2) — translate then shorten
+      // ── Col 3 (index 2): translate + shorten ──
       if (row[2] !== undefined && row[2] !== null && row[2] !== '') {
-        setStatus(`Translating row ${i} of ${jsonData.length - 1}…`);
+        setStatus(`🔤 Translating row ${i}/${total} → "${String(row[2]).substring(0,40)}"`);
         const hindi = await translateToHindi(String(row[2]));
         row[2] = shortenHindi(hindi);
+        await sleep(120);  // small delay to avoid rate-limit
+      }
+
+      // ── Col 4 (index 3): section shortening ──
+      if (row[3] !== undefined && row[3] !== null && row[3] !== '') {
+        row[3] = shortenSection(row[3]);
       }
 
       translatedData.push(row);
+      setProgress(Math.round((i / jsonData.length) * 100));
     }
 
-    setStatus("✅ Processing complete! Click Download.");
+    setProgress(100);
+    setStatus("✅ Processing complete! Download button dabayein.");
+    setBtns(false);
   };
+
+  reader.onerror = () => { setStatus("❌ File read error!"); setBtns(false); };
   reader.readAsArrayBuffer(file);
 }
 
 function downloadFile() {
-  if (!translatedData.length) { alert("Process a file first."); return; }
+  if (!translatedData.length) { alert("Pehle Process karein!"); return; }
   const ws = XLSX.utils.aoa_to_sheet(translatedData);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Processed");
   XLSX.writeFile(wb, "Court_Processed.xlsx");
-  setStatus("📥 File downloaded.");
+  setStatus("📥 File download ho gayi — Court_Processed.xlsx");
 }
 
-function setStatus(msg) {
-  document.getElementById('status').innerText = msg;
+function setStatus(msg) { document.getElementById('status').innerText = msg; }
+function setProgress(pct) { document.getElementById('progBar').style.width = pct + '%'; }
+function setBtns(processing) {
+  document.getElementById('btnProcess').disabled  = processing;
+  document.getElementById('btnDownload').disabled = processing;
 }
 </script>
 </body>
